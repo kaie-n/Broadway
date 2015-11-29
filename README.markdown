@@ -1,7 +1,7 @@
-A way to play back a background video animation on iPhone's Safari
+A way to autoplay inline video animation on mobile devices
 ===========
 This is a fork of the [Broadway H.264 decoder](https://github.com/mbebenita/Broadway).
-The focus here is on using that amazing decoder to play back H.264 encoded mp4 files as a gif replacment, where the HTML5 video tag is not suitable (Like in Safari on the iPhone, which doesn't allow inline videos as well as autoplay).
+The focus here is on using that amazing decoder to play back H.264 encoded mp4 files as a gif replacment, where the HTML5 video tag is not suitable (Like on iOS and Android, which both can't autoplay html5 video).
 
 This solution is ready to be used on a website.
 Check out the demo.html in the Player folder.
