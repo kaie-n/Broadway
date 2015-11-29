@@ -30,10 +30,6 @@ var Size = (function size() {
   return constructor;
 })();
 
-
-
-
-
 var Bytestream = (function BytestreamClosure() {
   function constructor(arrayBuffer, start, length) {
     this.bytes = new Uint8Array(arrayBuffer);
@@ -618,6 +614,7 @@ var Track = (function track () {
     sampleToOffset: function (sample) {
       var res = this.sampleToChunk(sample);
       var offset = this.chunkToOffset(res.index);
+      //var offset = this.chunkToOffset(0);
       return offset + this.sampleToSize(sample - res.offset, res.offset);
     },
     /**
@@ -655,55 +652,7 @@ var Track = (function track () {
         }
       }
     },
-    /**
-     * Gets the total time of the track.
-     */
-    getTotalTime: function () {
-      if (PARANOID) {
-        var table = this.trak.mdia.minf.stbl.stts.table;
-        var duration = 0;
-        for (var i = 0; i < table.length; i++) {
-          duration += table[i].count * table[i].delta;
-        }
-        assert (this.trak.mdia.mdhd.duration == duration);
-      }
-      return this.trak.mdia.mdhd.duration;
-    },
-    getTotalTimeInSeconds: function () {
-      return this.timeToSeconds(this.getTotalTime());
-    },
-    getTimeScale: function () {
-      return this.trak.mdia.mdhd.timeScale;
-    },
-    /**
-     * Converts time units to real time (seconds).
-     */
-    timeToSeconds: function (time) {
-      return time / this.getTimeScale();
-    },
-    /**
-     * Converts real time (seconds) to time units.
-     */
-    secondsToTime: function (seconds) {
-      return seconds * this.getTimeScale();
-    },
-    foo: function () {
-      /*
-      for (var i = 0; i < this.getSampleCount(); i++) {
-        var res = this.sampleToChunk(i);
-        console.info("Sample " + i + " -> " + res.index + " % " + res.offset +
-                     " @ " + this.chunkToOffset(res.index) +
-                     " @@ " + this.sampleToOffset(i));
-      }
-      console.info("Total Time: " + this.timeToSeconds(this.getTotalTime()));
-      var total = this.getTotalTimeInSeconds();
-      for (var i = 50; i < total; i += 0.1) {
-        // console.info("Time: " + i.toFixed(2) + " " + this.secondsToTime(i));
-
-        console.info("Time: " + i.toFixed(2) + " " + this.timeToSample(this.secondsToTime(i)));
-      }
-      */
-    },
+    
     /**
      * AVC samples contain one or more NAL units each of which have a length prefix.
      * This function returns an array of NAL units without their length prefixes.
@@ -725,35 +674,7 @@ var Track = (function track () {
 })();
 
 
-// Only add setZeroTimeout to the window object, and hide everything
-// else in a closure. (http://dbaron.org/log/20100309-faster-timeouts)
-(function() {
-    var timeouts = [];
-    var messageName = "zero-timeout-message";
 
-    // Like setTimeout, but only takes a function argument.  There's
-    // no time argument (always zero) and no arguments (you have to
-    // use a closure).
-    function setZeroTimeout(fn) {
-        timeouts.push(fn);
-        window.postMessage(messageName, "*");
-    }
-
-    function handleMessage(event) {
-        if (event.source == window && event.data == messageName) {
-            event.stopPropagation();
-            if (timeouts.length > 0) {
-                var fn = timeouts.shift();
-                fn();
-            }
-        }
-    }
-
-    window.addEventListener("message", handleMessage, true);
-
-    // Add the one thing we want added to the window object.
-    window.setZeroTimeout = setZeroTimeout;
-})();
 
 var MP4Player = (function reader() {
   var defaultConfig = {
@@ -763,24 +684,12 @@ var MP4Player = (function reader() {
     getBoundaryStrengthsA: "optimized"
   };
 
-  function constructor(stream, useWorkers, webgl, render) {
+  function constructor(stream, useWorkers, webgl, render, loop) {
     this.stream = stream;
     this.useWorkers = useWorkers;
     this.webgl = webgl;
     this.render = render;
-
-    this.statistics = {
-      videoStartTime: 0,
-      videoPictureCounter: 0,
-      windowStartTime: 0,
-      windowPictureCounter: 0,
-      fps: 0,
-      fpsMin: 1000,
-      fpsMax: -1000,
-      webGLTextureUploadTime: 0
-    };
-
-    this.onStatisticsUpdated = function () {};
+    this.loop = loop;
 
     this.avc = new Player({
       useWorker: useWorkers,
@@ -795,46 +704,10 @@ var MP4Player = (function reader() {
     this.webgl = this.avc.webgl;
     
     var self = this;
-    this.avc.onPictureDecoded = function(){
-      updateStatistics.call(self);
-    };
     
     this.canvas = this.avc.canvas;
   }
 
-  function updateStatistics() {
-    var s = this.statistics;
-    s.videoPictureCounter += 1;
-    s.windowPictureCounter += 1;
-    var now = Date.now();
-    if (!s.videoStartTime) {
-      s.videoStartTime = now;
-    }
-    var videoElapsedTime = now - s.videoStartTime;
-    s.elapsed = videoElapsedTime / 1000;
-    if (videoElapsedTime < 1000) {
-      return;
-    }
-
-    if (!s.windowStartTime) {
-      s.windowStartTime = now;
-      return;
-    } else if ((now - s.windowStartTime) > 1000) {
-      var windowElapsedTime = now - s.windowStartTime;
-      var fps = (s.windowPictureCounter / windowElapsedTime) * 1000;
-      s.windowStartTime = now;
-      s.windowPictureCounter = 0;
-
-      if (fps < s.fpsMin) s.fpsMin = fps;
-      if (fps > s.fpsMax) s.fpsMax = fps;
-      s.fps = fps;
-    }
-
-    var fps = (s.videoPictureCounter / videoElapsedTime) * 1000;
-    s.fpsSinceStart = fps;
-    this.onStatisticsUpdated(this.statistics);
-    return;
-  }
 
   constructor.prototype = {
     readAll: function(callback) {
@@ -867,17 +740,41 @@ var MP4Player = (function reader() {
       this.avc.decode(sps);
       this.avc.decode(pps);
 
+
       /* Decode Pictures */
       var pic = 0;
+      var duration = reader.tracks[1].trak.mdia.mdhd.duration;
+      var numberOfFrames = reader.tracks[1].trak.mdia.minf.stbl.stsz.table.length;
+      var fps = (numberOfFrames * reader.tracks[1].trak.mdia.mdhd.timeScale) / duration;
+
+      var lastTime = Date.now();
+
       setTimeout(function foo() {
         var avc = this.avc;
+        var timeBefore = Date.now();
         video.getSampleNALUnits(pic).forEach(function (nal) {
           avc.decode(nal);
         });
+        
+        var timeForDecoding = Date.now() - timeBefore;
+
         pic ++;
-        if (pic < 3000) {
-          setTimeout(foo.bind(this), 1);
-        };
+
+        if (pic > numberOfFrames) {
+          if (!this.loop) {
+            return;
+          }
+          pic = 0;
+        }
+
+        requestAnimationFrame(function() {
+          var delta = Date.now() - timeBefore;
+          lastTime = Date.now();
+          var nextFrame = (1000/fps) - delta;
+          setTimeout(foo.bind(this), nextFrame);
+        }.bind(this));
+        
+        
       }.bind(this), 1);
     }
   };
@@ -890,13 +787,7 @@ var Broadway = (function broadway() {
     var src = div.attributes.src ? div.attributes.src.value : undefined;
     var width = div.attributes.width ? div.attributes.width.value : 640;
     var height = div.attributes.height ? div.attributes.height.value : 480;
-
-    var controls = document.createElement('div');
-    controls.setAttribute('style', "z-index: 100; position: absolute; bottom: 0px; background-color: rgba(0,0,0,0.8); height: 30px; width: 100%; text-align: left;");
-    this.info = document.createElement('div');
-    this.info.setAttribute('style', "font-size: 14px; font-weight: bold; padding: 6px; color: lime;");
-    controls.appendChild(this.info);
-    div.appendChild(controls);
+    var loop = div.attributes.loop ? div.attributes.loop.value == "true" : true;
     
     var useWorkers = div.attributes.workers ? div.attributes.workers.value == "true" : false;
     var render = div.attributes.render ? div.attributes.render.value == "true" : false;
@@ -910,49 +801,11 @@ var Broadway = (function broadway() {
         webgl = false;
       };
     };
-    
-    var infoStrPre = "Click canvas to load and play - ";
-    var infoStr = "";
-    if (useWorkers){
-      infoStr += "worker thread ";
-    }else{
-      infoStr += "main thread ";
-    };
-
-    this.player = new MP4Player(new Stream(src), useWorkers, webgl, render);
+    this.player = new MP4Player(new Stream(src), useWorkers, webgl, render, loop);
     this.canvas = this.player.canvas;
-    this.canvas.onclick = function () {
-      this.play();
-    }.bind(this);
     div.appendChild(this.canvas);
-    
-    
-    infoStr += " - webgl: " + this.player.webgl;
-    this.info.innerHTML = infoStrPre + infoStr;
-    
 
     this.score = null;
-    this.player.onStatisticsUpdated = function (statistics) {
-      if (statistics.videoPictureCounter % 10 != 0) {
-        return;
-      }
-      var info = "";
-      if (statistics.fps) {
-        info += " fps: " + statistics.fps.toFixed(2);
-      }
-      if (statistics.fpsSinceStart) {
-        info += " avg: " + statistics.fpsSinceStart.toFixed(2);
-      }
-      var scoreCutoff = 1200;
-      if (statistics.videoPictureCounter < scoreCutoff) {
-        this.score = scoreCutoff - statistics.videoPictureCounter;
-      } else if (statistics.videoPictureCounter == scoreCutoff) {
-        this.score = statistics.fpsSinceStart.toFixed(2);
-      }
-      // info += " score: " + this.score;
-
-      this.info.innerHTML = infoStr + info;
-    }.bind(this);
   }
   constructor.prototype = {
     play: function () {

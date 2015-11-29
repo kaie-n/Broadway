@@ -20,8 +20,6 @@ p.decode(<binary>);
 
 */
 
-
-
 // universal module definition
 (function (root, factory) {
     if (typeof define === 'function' && define.amd) {
@@ -39,6 +37,18 @@ p.decode(<binary>);
 }(this, function (Decoder, WebGLCanvas) {
   "use strict";
   
+  function playVideoWhenReady() {
+    var nodes = document.querySelectorAll('div.broadway');
+      for (var i = 0; i < nodes.length; i++) {
+        var broadway = new Broadway(nodes[i]);
+        broadway.play();
+      }
+  }
+  if (document.readyState != 'loading'){
+    playVideoWhenReady();
+  } else {
+    document.addEventListener('DOMContentLoaded', playVideoWhenReady);
+  }
   
   var nowValue = Decoder.nowValue;
   
@@ -257,8 +267,6 @@ p.decode(<binary>);
       obj.canvas = document.createElement('canvas');
       obj.canvas.width = width;
       obj.canvas.height = height;
-      obj.canvas.style.backgroundColor = "#0D0E1B";
-      
       
       return obj;
     },

@@ -1,114 +1,25 @@
-Broadway.js
+A way to play back a background video animation on iPhone's Safari
 ===========
-A JavaScript H.264 decoder.
+This is a fork of the [Broadway H.264 decoder](https://github.com/mbebenita/Broadway).
+The focus here is on using that amazing decoder to play back H.264 encoded mp4 files as a gif replacment, where the HTML5 video tag is not suitable (Like in Safari on the iPhone, which doesn't allow inline videos as well as autoplay).
 
+This solution is ready to be used on a website.
+Check out the demo.html in the Player folder.
 
-View a Live Demo:  
-http://mbebenita.github.io/Broadway/foxDemo.html  
-http://mbebenita.github.io/Broadway/storyDemo.html  
-http://mbebenita.github.io/Broadway/treeDemo.html  
+Limitations
+===========
+The entire video file has to be downloaded first by the client before it can be played back. If this is an issue for you, this fork isn't for you. You could build your own player with WebSockets based on [BroadwayStream](https://github.com/soliton4/BroadwayStream).
 
-The video player first needs to download the entire video before it can start playing, thus appearing to be a bit slow at first, so have patience. You can start the video by clicking on each player. The top left player runs on the main thread, the remaining players run in background worker threads.
+Only h.264 encoded mp4 files are supported. There are certain limitations on the encoding profile, weighted prediction for P-frames as well as CABAC entropy encoding are not supported by the Broadway decoder.
 
-Use a example node app as template:  
-https://github.com/soliton4/BroadwayStream  
+If you encode your videos with ffmpeg, here is an example:
 
-Technical info
-==============
+    ffmpeg -y -i input.mp4 -vcodec libx264 -pass 1 -coder 0 -bf 0 -wpredp 0 -an -x264opts no-cabac:no-weightb -pix_fmt yuv420p -vf scale=568:320 output.mp4
 
-The demo is Android's H.264 decoder compiled with Emscripten to JavaScript, then further optimized with
-Google's JavaScript closure compiler and further optimized by hand to use WebGL.
+Usage
+===========
+Load all of the .js files from the Player folder and add the following markup:
 
-Building the demo:
+    <div class="broadway" src="video.mp4" loop="true" webgl="auto" workers="false" />
 
-Install and configure Emscripten (https://github.com/kripken/emscripten)  
-The current version of Broadway was built with emscripten 1.29.0  
-
-The code for the demo is in the Decoder folder, to build it run the make.py python script. (Requires at least python 2.7)
-
-Encoding Video
-==============
-
-The decoder expects an .mp4 file and does not support weighted prediction for P-frames and CABAC entropy encoding. To create such bitstreams use ffmpeg and x264 with the following command line options:
-
-```
-ffmpeg -y -i sourceFile -r 30000/1001 -b:a 2M -bt 4M -vcodec libx264 -pass 1 -coder 0 -bf 0 -flags -loop -wpredp 0 -an targetFile.mp4
-```
-
-API
-===
-
-Player.js, Decoder.js and YUVWebGLCanvas.js all have a unified module definition.  
-You can use them as plain js files or with common.js / AMD  
-
-#Player.js:  
-
-```
-var p = new Player({
-  <options>
-});
-
-p.canvas; // the canvas - put it where you want it
-
-p.decode(<h264 data>);
-```
-
-##options:  
-
-useWorker true / false  
-decode in a worker thread  
-
-workerFile <string>  
-path to Decoder.js. Only neccessary when using worker. defaults to "Decoder.js"  
-
-webgl true / "auto" / false  
-use webgl. defaults to "auto"  
-
-size { width: <num>, height: <num> }  
-initial size of the canvas. canvas will resize after video starts streaming.  
-
-##properties:  
-
-canvas  
-domNode  
-
-refers to the canvas element.  
-
-##methods:  
-
-decode (<bin>)
-
-feed the decoder with h264 stream data.  
-
-
-#Decoder.js:  
-
-```
-var p = new Decoder({
-  <options>
-});
-
-p.onPictureDecoded; // override with a callback function
-
-p.decode(<h264 data>);
-```
-
-##options:  
-
-rgb true / false  
-if true will convert the image to rgb. sligtly slower.  
-
-##properties:  
-
-onPictureDecoded  callback function(<bin>, width, height)
-
-will be called for each frame.
-
-##methods:  
-
-decode (<bin>)
-
-feed the decoder with h264 stream data.  
-
-
-#[Real World Uses of Broadway.js](https://github.com/mbebenita/Broadway/wiki/Real-World-Uses)
+ Once the video is loaded, a canvas element is added to the div and the video frames are rendered to that canvas. Make sure your video is encoded regarding the above mentioned limitations.
