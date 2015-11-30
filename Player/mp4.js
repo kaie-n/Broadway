@@ -767,14 +767,10 @@ var MP4Player = (function reader() {
           pic = 0;
         }
 
-        requestAnimationFrame(function() {
-          var delta = Date.now() - timeBefore;
-          lastTime = Date.now();
-          var nextFrame = (1000/fps) - delta;
-          setTimeout(foo.bind(this), nextFrame);
-        }.bind(this));
-        
-        
+        var delta = Date.now() - timeBefore;
+        lastTime = Date.now();
+        var nextFrame = (1000/fps) - delta;
+        setTimeout(foo.bind(this), nextFrame);
       }.bind(this), 1);
     }
   };
