@@ -18,7 +18,7 @@ If you encode your videos with ffmpeg, here is an example:
 
 Usage
 ===========
-Load all of the .js files from the Player folder and add the following markup:
+Load the broadwayPlayer-min.js file from the Player folder and add the following markup:
 
     <div class="broadway" src="video.mp4" loop="true" webgl="auto" workers="false" />
 
